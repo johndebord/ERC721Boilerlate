@@ -62,54 +62,54 @@ library AddressUtils {
 
 /// @title ERC721Standard Non-Fungible Token Standard interface
 /// @dev see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-721.md
-interface ERC721Standard {
+contract ERC721Standard {
     event Transfer(address indexed _from, address indexed _to, uint256 _tokenId);
     event Approval(address indexed _owner, address indexed _approved, uint256 _tokenId);
     event ApprovalForAll(address indexed _owner, address indexed _operator, bool _approved);
     
-    function balanceOf(address _owner) external view returns (uint256 _balance);
-    function ownerOf(uint256 _tokenId) external view returns (address _owner);
+    function balanceOf(address _owner) public view returns (uint256 _balance);
+    function ownerOf(uint256 _tokenId) public view returns (address _owner);
 
-    function safeTransferFrom(address _from, address _to, uint256 _tokenId) external payable;
-    function safeTransferFrom(address _from, address _to, uint256 _tokenId, bytes _data) external payable;
-    function transferFrom(address _from, address _to, uint256 _tokenId) external payable;
+    function safeTransferFrom(address _from, address _to, uint256 _tokenId) public payable;
+    function safeTransferFrom(address _from, address _to, uint256 _tokenId, bytes _data) public payable;
+    function transferFrom(address _from, address _to, uint256 _tokenId) public payable;
 
-    function approve(address _to, uint256 _tokenId) external payable;
-    function setApprovalForAll(address _operator, bool _approved) external;
-    function getApproved(uint256 _tokenId) external view returns (address);
-    function isApprovedForAll(address _owner, address _operator) external view returns (bool);
+    function approve(address _to, uint256 _tokenId) public payable;
+    function setApprovalForAll(address _operator, bool _approved) public;
+    function getApproved(uint256 _tokenId) public view returns (address);
+    function isApprovedForAll(address _owner, address _operator) public view returns (bool);
 }
 
     
 /// @title ERC721TokenReceiver
-interface ERC721TokenReceiver is ERC721Standard {
-    function onERC721Received(address _from, uint256 _tokenId, bytes data) external returns(bytes4);
+contract ERC721TokenReceiver is ERC721Standard {
+    function onERC721Received(address _from, uint256 _tokenId, bytes data) public returns(bytes4);
 }
 
 
 /// @title ERC721Metadata
-interface ERC721Metadata is ERC721Standard {
-    function name() external view returns (string _name);
-    function symbol() external view returns (string _symbol);
-    function tokenURI(uint256 _tokenId) external view returns (string);
+contract ERC721Metadata is ERC721Standard {
+    function name() public view returns (string _name);
+    function symbol() public view returns (string _symbol);
+    function tokenURI(uint256 _tokenId) public view returns (string);
 }
 
 
 /// @title ERC721Enumerable
-interface ERC721Enumerable is ERC721Standard {
-    function totalSupply() external view returns (uint256);
-    function tokenOfOwnerByIndex(address _owner, uint256 _index) external view returns (uint256 _tokenId);
-    function tokenByIndex(uint256 _index) external view returns (uint256);
+contract ERC721Enumerable is ERC721Standard {
+    function totalSupply() public view returns (uint256);
+    function tokenOfOwnerByIndex(address _owner, uint256 _index) public view returns (uint256 _tokenId);
+    function tokenByIndex(uint256 _index) public view returns (uint256);
 }
 
 
 /// @title ERC721Supplemental
-interface ERC721Supplemental is ERC721Standard {
-    function exists(uint256 _tokenId) external view returns (bool);
+contract ERC721Supplemental is ERC721Standard {
+    function exists(uint256 _tokenId) public view returns (bool);
 }
 
 /// @title ERC721
-interface ERC721 is ERC721Standard, ERC721TokenReceiver, ERC721Enumerable, ERC721Supplemental {
+contract ERC721 is ERC721Standard, ERC721TokenReceiver, ERC721Enumerable, ERC721Supplemental {
 }
 
 
@@ -202,7 +202,7 @@ contract ERC721Token is ERC721 {
     /// @param _from current owner of the token
     /// @param _to address to receive the ownership of the given token ID
     /// @param _tokenId uint256 ID of the token to be transferred
-    function safeTransferFrom(address _from, address _to, uint256 _tokenId) public canTransfer(_tokenId) {
+    function safeTransferFrom(address _from, address _to, uint256 _tokenId) payable public canTransfer(_tokenId) {
         // solium-disable-next-line arg-overflow
         safeTransferFrom(_from, _to, _tokenId, "");
     }
@@ -217,7 +217,7 @@ contract ERC721Token is ERC721 {
     /// @param _to address to receive the ownership of the given token ID
     /// @param _tokenId uint256 ID of the token to be transferred
     /// @param _data bytes data to send along with a safe transfer check
-    function safeTransferFrom(address _from, address _to, uint256 _tokenId, bytes _data) public canTransfer(_tokenId) {
+    function safeTransferFrom(address _from, address _to, uint256 _tokenId, bytes _data) payable public canTransfer(_tokenId) {
         transferFrom(_from, _to, _tokenId);
         // solium-disable-next-line arg-overflow
         require(checkAndCallSafeTransfer(_from, _to, _tokenId, _data));
@@ -229,7 +229,7 @@ contract ERC721Token is ERC721 {
     /// @param _from current owner of the token
     /// @param _to address to receive the ownership of the given token ID
     /// @param _tokenId uint256 ID of the token to be transferred
-    function transferFrom(address _from, address _to, uint256 _tokenId) public canTransfer(_tokenId) {
+    function transferFrom(address _from, address _to, uint256 _tokenId) payable public canTransfer(_tokenId) {
         require(_from != address(0));
         require(_to != address(0));
 
@@ -246,7 +246,7 @@ contract ERC721Token is ERC721 {
     /// @dev Can only be called by the token owner or an approved operator.
     /// @param _to address to be approved for the given token ID
     /// @param _tokenId uint256 ID of the token to be approved
-    function approve(address _to, uint256 _tokenId) public {
+    function approve(address _to, uint256 _tokenId) payable public {
         address owner = ownerOf(_tokenId);
         require(_to != owner);
         require(msg.sender == owner || isApprovedForAll(owner, msg.sender));
@@ -463,7 +463,9 @@ contract ERC721Token is ERC721 {
         if (!_to.isContract()) {
             return true;
         }
-        bytes4 retval = ERC721Receiver(_to).onERC721Received(_from, _tokenId, _data);
+
+        bytes4 retval = 1;
+        //bytes4 retval = ERC721Receiver(_to).onERC721Received(_from, _tokenId, _data);
         return (retval == ERC721_RECEIVED);
     }
 
