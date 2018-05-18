@@ -5,7 +5,7 @@ pragma solidity ^0.4.23;
 /// @dev Math operations with safety checks that throw on error
 library SafeMath {
 
-    /// @dev Multiplies two numbers, throws on overflow.
+    /// @dev Multiplies two numbers, throws on overflow
     function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
         if (a == 0) {
             return 0;
@@ -15,7 +15,7 @@ library SafeMath {
         return c;
     }
 
-    /// @dev Integer division of two numbers, truncating the quotient.
+    /// @dev Integer division of two numbers, truncating the quotient
     function div(uint256 a, uint256 b) internal pure returns (uint256) {
         // assert(b > 0); // Solidity automatically throws when dividing by 0
         // uint256 c = a / b;
@@ -23,13 +23,13 @@ library SafeMath {
         return a / b;
     }
 
-    /// @dev Subtracts two numbers, throws on overflow (i.e. if subtrahend is greater than minuend).
+    /// @dev Subtracts two numbers, throws on overflow (i.e. if subtrahend is greater than minuend)
     function sub(uint256 a, uint256 b) internal pure returns (uint256) {
         assert(b <= a);
         return a - b;
     }
 
-    /// @dev Adds two numbers, throws on overflow.
+    /// @dev Adds two numbers, throws on overflow
     function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
         c = a + b;
         assert(c >= a);
@@ -47,12 +47,6 @@ library AddressUtils {
     /// @return whether the target address is a contract
     function isContract(address addr) internal view returns (bool) {
         uint256 size;
-        // XXX Currently there is no better way to check if there is a contract in an address
-        // than to check the size of the code at that address.
-        // See https://ethereum.stackexchange.com/a/14016/36603
-        // for more details about how this works.
-        // TODO Check this again before the Serenity release, because all addresses will be
-        // contracts then.
         // solium-disable-next-line security/no-inline-assembly
         assembly { size := extcodesize(addr) }
         return size > 0;
@@ -60,8 +54,8 @@ library AddressUtils {
 }
 
 
-/// @title ERC721Standard Non-Fungible Token Standard interface
-/// @dev see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-721.md
+/// @title ERC721Standard Non-Fungible Token Standard
+/// @dev See https://github.com/ethereum/EIPs/blob/master/EIPS/eip-721.md
 contract ERC721Standard {
     event Transfer(address indexed _from, address indexed _to, uint256 _tokenId);
     event Approval(address indexed _owner, address indexed _approved, uint256 _tokenId);
@@ -81,13 +75,15 @@ contract ERC721Standard {
 }
 
     
-/// @title ERC721TokenReceiver
+/// @title ERC721TokenReceiver, to accept safe transfers
+/// @dev See https://github.com/ethereum/EIPs/blob/master/EIPS/eip-721.md
 contract ERC721TokenReceiver is ERC721Standard {
     function onERC721Received(address _from, uint256 _tokenId, bytes data) public returns(bytes4);
 }
 
 
-/// @title ERC721Metadata
+/// @title ERC721Metadata, optional metadata extension
+/// @dev See https://github.com/ethereum/EIPs/blob/master/EIPS/eip-721.md
 contract ERC721Metadata is ERC721Standard {
     function name() public view returns (string _name);
     function symbol() public view returns (string _symbol);
@@ -95,15 +91,16 @@ contract ERC721Metadata is ERC721Standard {
 }
 
 
-/// @title ERC721Enumerable
+/// @title ERC721Enumerable, optional enumeration extension
+/// @dev See https://github.com/ethereum/EIPs/blob/master/EIPS/eip-721.md
 contract ERC721Enumerable is ERC721Standard {
     function totalSupply() public view returns (uint256);
-    function tokenOfOwnerByIndex(address _owner, uint256 _index) public view returns (uint256 _tokenId);
     function tokenByIndex(uint256 _index) public view returns (uint256);
+    function tokenOfOwnerByIndex(address _owner, uint256 _index) public view returns (uint256 _tokenId);
 }
 
 
-/// @title ERC721Supplemental
+/// @title ERC721Supplemental, for supplemental functions used in this implementation
 contract ERC721Supplemental is ERC721Standard {
     function exists(uint256 _tokenId) public view returns (bool);
 }
@@ -113,7 +110,7 @@ contract ERC721 is ERC721Standard, ERC721TokenReceiver, ERC721Enumerable, ERC721
 }
 
 
-/// @title ERC721Token Non-Fungible Token Standard basic implementation
+/// @title ERC721Token Non-Fungible Token Standard implementation
 /// @dev see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-721.md
 contract ERC721Token is ERC721 {
     using SafeMath for uint256;
@@ -176,59 +173,66 @@ contract ERC721Token is ERC721 {
         symbol_ = _symbol;
     }
 
-    /// @dev Gets the balance of the specified address
-    /// @param _owner address to query the balance of
-    /// @return uint256 representing the amount owned by the passed address
+    // @notice Count all NFTs assigned to an owner
+    /// @dev NFTs assigned to the zero address are considered invalid, and this
+    ///  function throws for queries about the zero address
+    /// @param _owner An address for whom to query the balance
+    /// @return The number of NFTs owned by `_owner`, possibly zero
     function balanceOf(address _owner) public view returns (uint256) {
         require(_owner != address(0));
         return ownedTokensCount[_owner];
     }
 
-    /// @dev Gets the owner of the specified token ID
-    /// @param _tokenId uint256 ID of the token to query the owner of
-    /// @return owner address currently marked as the owner of the given token ID
+    /// @notice Find the owner of an NFT
+    /// @dev NFTs assigned to zero address are considered invalid, and queries
+    ///  about them do throw
+    /// @param _tokenId The identifier for an NFT
+    /// @return The address of the owner of the NFT
     function ownerOf(uint256 _tokenId) public view returns (address) {
         address owner = tokenOwner[_tokenId];
         require(owner != address(0));
         return owner;
     }
 
-    /// @dev Safely transfers the ownership of a given token ID to another address
-    /// @dev If the target address is a contract, it must implement `onERC721Received`,
-    ///  which is called upon a safe transfer, and return the magic value
-    ///  `bytes4(keccak256("onERC721Received(address,uint256,bytes)"))`; otherwise,
-    ///  the transfer is reverted.
-    /// @dev Requires the msg sender to be the owner, approved, or operator
-    /// @param _from current owner of the token
-    /// @param _to address to receive the ownership of the given token ID
-    /// @param _tokenId uint256 ID of the token to be transferred
+    /// @notice Transfers the ownership of an NFT from one address to another address
+    /// @dev Throws unless `msg.sender` is the current owner, an authorized
+    ///  operator, or the approved address for this NFT. Throws if `_from` is
+    ///  not the current owner. Throws if `_to` is the zero address. Throws if
+    ///  `_tokenId` is not a valid NFT. When transfer is complete, this function
+    ///  checks if `_to` is a smart contract (code size > 0). If so, it calls
+    ///  `onERC721Received` on `_to` and throws if the return value is not
+    ///  `bytes4(keccak256("onERC721Received(address,uint256,bytes)"))`
+    /// @param _from The current owner of the NFT
+    /// @param _to The new owner
+    /// @param _tokenId The NFT to transfer
+    /// @param data Additional data with no specified format, sent in call to `_to`
     function safeTransferFrom(address _from, address _to, uint256 _tokenId) payable public canTransfer(_tokenId) {
         // solium-disable-next-line arg-overflow
         safeTransferFrom(_from, _to, _tokenId, "");
     }
 
-    /// @dev Safely transfers the ownership of a given token ID to another address
-    /// @dev If the target address is a contract, it must implement `onERC721Received`,
-    ///  which is called upon a safe transfer, and return the magic value
-    ///  `bytes4(keccak256("onERC721Received(address,uint256,bytes)"))`; otherwise,
-    ///  the transfer is reverted.
-    /// @dev Requires the msg sender to be the owner, approved, or operator
-    /// @param _from current owner of the token
-    /// @param _to address to receive the ownership of the given token ID
-    /// @param _tokenId uint256 ID of the token to be transferred
-    /// @param _data bytes data to send along with a safe transfer check
+    /// @notice Transfers the ownership of an NFT from one address to another address
+    /// @dev This works identically to the other function with an extra data parameter,
+    ///  except this function just sets data to ""
+    /// @param _from The current owner of the NFT
+    /// @param _to The new owner
+    /// @param _tokenId The NFT to transfer
     function safeTransferFrom(address _from, address _to, uint256 _tokenId, bytes _data) payable public canTransfer(_tokenId) {
         transferFrom(_from, _to, _tokenId);
         // solium-disable-next-line arg-overflow
         require(checkAndCallSafeTransfer(_from, _to, _tokenId, _data));
     }
 
-    /// @dev Transfers the ownership of a given token ID to another address
-    /// @dev Usage of this method is discouraged, use `safeTransferFrom` whenever possible
-    /// @dev Requires the msg sender to be the owner, approved, or operator
-    /// @param _from current owner of the token
-    /// @param _to address to receive the ownership of the given token ID
-    /// @param _tokenId uint256 ID of the token to be transferred
+    /// @notice Transfer ownership of an NFT -- THE CALLER IS RESPONSIBLE
+    ///  TO CONFIRM THAT `_to` IS CAPABLE OF RECEIVING NFTS OR ELSE
+    ///  THEY MAY BE PERMANENTLY LOST
+    /// @dev Throws unless `msg.sender` is the current owner, an authorized
+    ///  operator, or the approved address for this NFT. Throws if `_from` is
+    ///  not the current owner. Throws if `_to` is the zero address. Throws if
+    ///  `_tokenId` is not a valid NFT.
+    /// @param _from The current owner of the NFT
+    /// @param _to The new owner
+    /// @param _tokenId The NFT to transfer
     function transferFrom(address _from, address _to, uint256 _tokenId) payable public canTransfer(_tokenId) {
         require(_from != address(0));
         require(_to != address(0));
@@ -240,12 +244,12 @@ contract ERC721Token is ERC721 {
         emit Transfer(_from, _to, _tokenId);
     }
 
-    /// @dev Approves another address to transfer the given token ID
-    /// @dev The zero address indicates there is no approved address.
-    /// @dev There can only be one approved address per token at a given time.
-    /// @dev Can only be called by the token owner or an approved operator.
-    /// @param _to address to be approved for the given token ID
-    /// @param _tokenId uint256 ID of the token to be approved
+    /// @notice Set or reaffirm the approved address for an NFT
+    /// @dev The zero address indicates there is no approved address
+    /// @dev Throws unless `msg.sender` is the current NFT owner, or an authorized
+    ///  operator of the current owner
+    /// @param _approved The new approved NFT controller
+    /// @param _tokenId The NFT to approve
     function approve(address _to, uint256 _tokenId) payable public {
         address owner = ownerOf(_tokenId);
         require(_to != owner);
@@ -257,75 +261,100 @@ contract ERC721Token is ERC721 {
         }
     }
 
-    /// @dev Sets or unsets the approval of a given operator
-    /// @dev An operator is allowed to transfer all tokens of the sender on their behalf
-    /// @param _to operator address to set the approval
-    /// @param _approved representing the status of the approval to be set
+    /// @notice Enable or disable approval for a third party ("operator") to manage
+    ///  all of `msg.sender`'s assets
+    /// @dev Emits the ApprovalForAll event. The contract MUST allow
+    ///  multiple operators per owner
+    /// @param _operator Address to add to the set of authorized operators
+    /// @param _approved True if the operator is approved, false to revoke approval
     function setApprovalForAll(address _to, bool _approved) public {
         require(_to != msg.sender);
         operatorApprovals[msg.sender][_to] = _approved;
         emit ApprovalForAll(msg.sender, _to, _approved);
     }
 
-    /// @dev Gets the approved address for a token ID, or zero if no address set
-    /// @param _tokenId uint256 ID of the token to query the approval of
-    /// @return address currently approved for the given token ID
+    /// @notice Get the approved address for a single NFT
+    /// @dev Throws if `_tokenId` is not a valid NFT
+    /// @param _tokenId The NFT to find the approved address for
+    /// @return The approved address for this NFT, or the zero address if there is none
     function getApproved(uint256 _tokenId) public view returns (address) {
         return tokenApprovals[_tokenId];
     }
 
-    /// @dev Tells whether an operator is approved by a given owner
-    /// @param _owner owner address which you want to query the approval of
-    /// @param _operator operator address which you want to query the approval of
-    /// @return bool whether the given operator is approved by the given owner
+    /// @notice Query if an address is an authorized operator for another address
+    /// @param _owner The address that owns the NFTs
+    /// @param _operator The address that acts on behalf of the owner
+    /// @return True if `_operator` is an approved operator for `_owner`, false otherwise
     function isApprovedForAll(address _owner, address _operator) public view returns (bool) {
         return operatorApprovals[_owner][_operator];
     }
 
+    /// @notice Handle the receipt of an NFT
+    /// @dev The ERC721 smart contract calls this function on the recipient
+    ///  after a `transfer`. This function MAY throw to revert and reject the
+    ///  transfer. This function MUST use 50,000 gas or less. Return of other
+    ///  than the magic value MUST result in the transaction being reverted
+    ///  Note: the contract address is always the message sender
+    /// @param _from The sending address
+    /// @param _tokenId The NFT identifier which is being transfered
+    /// @param data Additional data with no specified format
+    /// @return `bytes4(keccak256("onERC721Received(address,uint256,bytes)"))`
+    ///  unless throwing
     function onERC721Received(address, uint256, bytes) public returns(bytes4) {
         return ERC721_RECEIVED;
     }
 
+    /// @notice A descriptive name for a collection of NFTs in this contract
     function name() public view returns (string) {
         return name_;
     }
 
-    /// @dev Gets the token symbol
-    /// @return string representing the token symbol
+    /// @notice An abbreviated name for NFTs in this contract
     function symbol() public view returns (string) {
         return symbol_;
     }
 
-    /// @dev Returns an URI for a given token ID
-    /// @dev Throws if the token ID does not exist. May return an empty string.
-    /// @param _tokenId uint256 ID of the token to query
+    /// @notice A distinct Uniform Resource Identifier (URI) for a given asset.
+    /// @dev Throws if `_tokenId` is not a valid NFT. URIs are defined in RFC
+    ///  3986. The URI may point to a JSON file that conforms to the "ERC721
+    ///  Metadata JSON Schema"
     function tokenURI(uint256 _tokenId) public view returns (string) {
         require(exists(_tokenId));
         return tokenURIs[_tokenId];
     }
 
-    /// @dev Gets the total amount of tokens stored by the contract
-    /// @return uint256 representing the total amount of tokens
+    /// @notice Count NFTs tracked by this contract
+    /// @return A count of valid NFTs tracked by this contract, where each one of
+    ///  them has an assigned and queryable owner not equal to the zero address
     function totalSupply() public view returns (uint256) {
         return allTokens.length;
-    }
-
-    /// @dev Gets the token ID at a given index of the tokens list of the requested owner
-    /// @param _owner address owning the tokens list to be accessed
-    /// @param _index uint256 representing the index to be accessed of the requested tokens list
-    /// @return uint256 token ID at the given index of the tokens list owned by the requested address
-    function tokenOfOwnerByIndex(address _owner, uint256 _index) public view returns (uint256) {
-        require(_index < balanceOf(_owner));
-        return ownedTokens[_owner][_index];
     }
 
     /// @dev Gets the token ID at a given index of all the tokens in this contract
     /// @dev Reverts if the index is greater or equal to the total number of tokens
     /// @param _index uint256 representing the index to be accessed of the tokens list
     /// @return uint256 token ID at the given index of the tokens list
+
+    /// @notice Enumerate valid NFTs
+    /// @dev Throws if `_index` >= `totalSupply()`.
+    /// @param _index A counter less than `totalSupply()`
+    /// @return The token identifier for the `_index`th NFT,
+    ///  (sort order not specified)
     function tokenByIndex(uint256 _index) public view returns (uint256) {
         require(_index < totalSupply());
         return allTokens[_index];
+    }
+
+    /// @notice Enumerate NFTs assigned to an owner
+    /// @dev Throws if `_index` >= `balanceOf(_owner)` or if
+    ///  `_owner` is the zero address, representing invalid NFTs
+    /// @param _owner An address where we are interested in NFTs owned by them
+    /// @param _index A counter less than `balanceOf(_owner)`
+    /// @return The token identifier for the `_index`th NFT assigned to `_owner`,
+    ///   (sort order not specified)
+    function tokenOfOwnerByIndex(address _owner, uint256 _index) public view returns (uint256) {
+        require(_index < balanceOf(_owner));
+        return ownedTokens[_owner][_index];
     }
 
     /// @dev Returns whether the specified token exists
