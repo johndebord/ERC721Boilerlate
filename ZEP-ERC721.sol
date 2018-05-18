@@ -60,7 +60,7 @@ library AddressUtils {
 }
 
 
-/// @title ERC721 Non-Fungible Token Standard interface
+/// @title ERC721Standard Non-Fungible Token Standard interface
 /// @dev see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-721.md
 interface ERC721Standard {
     event Transfer(address indexed _from, address indexed _to, uint256 _tokenId);
@@ -81,11 +81,13 @@ interface ERC721Standard {
 }
 
     
+/// @title ERC721TokenReceiver
 interface ERC721TokenReceiver is ERC721Standard {
     function onERC721Received(address _from, uint256 _tokenId, bytes data) external returns(bytes4);
 }
 
 
+/// @title ERC721Metadata
 interface ERC721Metadata is ERC721Standard {
     function name() external view returns (string _name);
     function symbol() external view returns (string _symbol);
@@ -93,6 +95,7 @@ interface ERC721Metadata is ERC721Standard {
 }
 
 
+/// @title ERC721Enumerable
 interface ERC721Enumerable is ERC721Standard {
     function totalSupply() external view returns (uint256);
     function tokenOfOwnerByIndex(address _owner, uint256 _index) external view returns (uint256 _tokenId);
@@ -100,16 +103,17 @@ interface ERC721Enumerable is ERC721Standard {
 }
 
 
+/// @title ERC721Supplemental
 interface ERC721Supplemental is ERC721Standard {
     function exists(uint256 _tokenId) external view returns (bool);
 }
 
-
+/// @title ERC721
 interface ERC721 is ERC721Standard, ERC721TokenReceiver, ERC721Enumerable, ERC721Supplemental {
 }
 
 
-/// @title ERC721 Non-Fungible Token Standard basic implementation
+/// @title ERC721Token Non-Fungible Token Standard basic implementation
 /// @dev see https://github.com/ethereum/EIPs/blob/master/EIPS/eip-721.md
 contract ERC721Token is ERC721 {
     using SafeMath for uint256;
@@ -332,32 +336,14 @@ contract ERC721Token is ERC721 {
         return owner != address(0);
     }
 
-    
-
-
-
-
-
-
-
-
-
-
-
-    /// @dev Internal function to set the token URI for a given token
-    /// @dev Reverts if the token ID does not exist
-    /// @param _tokenId uint256 ID of the token to set its URI
-    /// @param _uri string URI to assign
-    function _setTokenURI(uint256 _tokenId, string _uri) internal {
-        require(exists(_tokenId));
-        tokenURIs[_tokenId] = _uri;
-    }
-
     /// @dev Internal function to add a token ID to the list of a given address
     /// @param _to address representing the new owner of the given token ID
     /// @param _tokenId uint256 ID of the token to be added to the tokens list of the given address
     function addTokenTo(address _to, uint256 _tokenId) internal {
-        super.addTokenTo(_to, _tokenId);
+        require(tokenOwner[_tokenId] == address(0));
+
+        tokenOwner[_tokenId] = _to;
+        ownedTokensCount[_to] = ownedTokensCount[_to].add(1);
         uint256 length = ownedTokens[_to].length;
         ownedTokens[_to].push(_tokenId);
         ownedTokensIndex[_tokenId] = length;
@@ -369,7 +355,10 @@ contract ERC721Token is ERC721 {
     /// @param _from address representing the previous owner of the given token ID
     /// @param _tokenId uint256 ID of the token to be removed from the tokens list of the given address
     function removeTokenFrom(address _from, uint256 _tokenId) internal {
-        super.removeTokenFrom(_from, _tokenId);
+        require(ownerOf(_tokenId) == _from);
+
+        ownedTokensCount[_from] = ownedTokensCount[_from].sub(1);
+        tokenOwner[_tokenId] = address(0);
 
         uint256 tokenIndex = ownedTokensIndex[_tokenId];
         uint256 lastTokenIndex = ownedTokens[_from].length.sub(1);
@@ -391,10 +380,13 @@ contract ERC721Token is ERC721 {
     /// @param _to address the beneficiary that will own the minted token
     /// @param _tokenId uint256 ID of the token to be minted by the msg.sender
     function _mint(address _to, uint256 _tokenId) internal {
-        super._mint(_to, _tokenId);
-
+        require(_to != address(0));
+        addTokenTo(_to, _tokenId);
+        
         allTokensIndex[_tokenId] = allTokens.length;
         allTokens.push(_tokenId);
+
+        emit Transfer(address(0), _to, _tokenId);
     }
 
     /// @dev Internal function to burn a specific token
@@ -402,7 +394,8 @@ contract ERC721Token is ERC721 {
     /// @param _owner owner of the token to burn
     /// @param _tokenId uint256 ID of the token being burned by the msg.sender
     function _burn(address _owner, uint256 _tokenId) internal {
-        super._burn(_owner, _tokenId);
+        clearApproval(_owner, _tokenId);
+        removeTokenFrom(_owner, _tokenId);
 
         // Clear metadata (if any)
         if (bytes(tokenURIs[_tokenId]).length != 0) {
@@ -422,45 +415,9 @@ contract ERC721Token is ERC721 {
         allTokens.length--;
         allTokensIndex[_tokenId] = 0;
         allTokensIndex[lastToken] = tokenIndex;
+
+        emit Transfer(_owner, address(0), _tokenId);
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-    
 
     /// @dev Returns whether the given spender can transfer a given token ID
     /// @param _spender address of the spender to query
@@ -472,25 +429,6 @@ contract ERC721Token is ERC721 {
         // https://github.com/duaraghav8/Solium/issues/175
         // solium-disable-next-line operator-whitespace
         return (owner == _spender || getApproved(_tokenId) == _spender || isApprovedForAll(owner, _spender));
-    }
-
-    /// @dev Internal function to mint a new token
-    /// @dev Reverts if the given token ID already exists
-    /// @param _to The address that will own the minted token
-    /// @param _tokenId uint256 ID of the token to be minted by the msg.sender
-    function _mint(address _to, uint256 _tokenId) internal {
-        require(_to != address(0));
-        addTokenTo(_to, _tokenId);
-        emit Transfer(address(0), _to, _tokenId);
-    }
-
-    /// @dev Internal function to burn a specific token
-    /// @dev Reverts if the token does not exist
-    /// @param _tokenId uint256 ID of the token being burned by the msg.sender
-    function _burn(address _owner, uint256 _tokenId) internal {
-        clearApproval(_owner, _tokenId);
-        removeTokenFrom(_owner, _tokenId);
-        emit Transfer(_owner, address(0), _tokenId);
     }
 
     /// @dev Internal function to clear current approval of a given token ID
@@ -505,22 +443,13 @@ contract ERC721Token is ERC721 {
         }
     }
 
-    /// @dev Internal function to add a token ID to the list of a given address
-    /// @param _to address representing the new owner of the given token ID
-    /// @param _tokenId uint256 ID of the token to be added to the tokens list of the given address
-    function addTokenTo(address _to, uint256 _tokenId) internal {
-        require(tokenOwner[_tokenId] == address(0));
-        tokenOwner[_tokenId] = _to;
-        ownedTokensCount[_to] = ownedTokensCount[_to].add(1);
-    }
-
-    /// @dev Internal function to remove a token ID from the list of a given address
-    /// @param _from address representing the previous owner of the given token ID
-    /// @param _tokenId uint256 ID of the token to be removed from the tokens list of the given address
-    function removeTokenFrom(address _from, uint256 _tokenId) internal {
-        require(ownerOf(_tokenId) == _from);
-        ownedTokensCount[_from] = ownedTokensCount[_from].sub(1);
-        tokenOwner[_tokenId] = address(0);
+    /// @dev Internal function to set the token URI for a given token
+    /// @dev Reverts if the token ID does not exist
+    /// @param _tokenId uint256 ID of the token to set its URI
+    /// @param _uri string URI to assign
+    function _setTokenURI(uint256 _tokenId, string _uri) internal {
+        require(exists(_tokenId));
+        tokenURIs[_tokenId] = _uri;
     }
 
     /// @dev Internal function to invoke `onERC721Received` on a target address
@@ -537,4 +466,5 @@ contract ERC721Token is ERC721 {
         bytes4 retval = ERC721Receiver(_to).onERC721Received(_from, _tokenId, _data);
         return (retval == ERC721_RECEIVED);
     }
+
 }
